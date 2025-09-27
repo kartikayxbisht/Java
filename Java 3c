@@ -1,0 +1,162 @@
+import java.sql.*;
+import java.util.*;
+
+/**
+ * Student Management Application using JDBC + MVC style in one file.
+ * Make sure MySQL is running and a database/table exist:
+ *
+ *  CREATE DATABASE CompanyDB;
+ *  USE CompanyDB;
+ *  CREATE TABLE Student(
+ *      StudentID INT PRIMARY KEY,
+ *      Name VARCHAR(50),
+ *      Department VARCHAR(50),
+ *      Marks INT
+ *  );
+ *
+ * Add MySQL JDBC driver (mysql-connector-j.jar) to your classpath.
+ */
+public class StudentManagementApp {
+
+    // ---------- Model ----------
+    static class Student {
+        private int studentID;
+        private String name;
+        private String department;
+        private int marks;
+
+        public Student(int studentID, String name, String department, int marks) {
+            this.studentID = studentID;
+            this.name = name;
+            this.department = department;
+            this.marks = marks;
+        }
+        public int getStudentID() { return studentID; }
+        public String getName() { return name; }
+        public String getDepartment() { return department; }
+        public int getMarks() { return marks; }
+    }
+
+    // ---------- DAO / Controller ----------
+    static class StudentDAO {
+        private static final String URL  = "jdbc:mysql://localhost:3306/CompanyDB";
+        private static final String USER = "root";
+        private static final String PASS = "root"; // change if needed
+
+        public void insert(Student s) throws SQLException {
+            String sql = "INSERT INTO Student VALUES (?,?,?,?)";
+            try (Connection con = DriverManager.getConnection(URL, USER, PASS);
+                 PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, s.getStudentID());
+                ps.setString(2, s.getName());
+                ps.setString(3, s.getDepartment());
+                ps.setInt(4, s.getMarks());
+                ps.executeUpdate();
+            }
+        }
+
+        public List<Student> getAll() throws SQLException {
+            List<Student> list = new ArrayList<>();
+            String sql = "SELECT * FROM Student";
+            try (Connection con = DriverManager.getConnection(URL, USER, PASS);
+                 Statement st = con.createStatement();
+                 ResultSet rs = st.executeQuery(sql)) {
+                while (rs.next()) {
+                    list.add(new Student(
+                            rs.getInt("StudentID"),
+                            rs.getString("Name"),
+                            rs.getString("Department"),
+                            rs.getInt("Marks")));
+                }
+            }
+            return list;
+        }
+
+        public void updateMarks(int id, int marks) throws SQLException {
+            String sql = "UPDATE Student SET Marks=? WHERE StudentID=?";
+            try (Connection con = DriverManager.getConnection(URL, USER, PASS);
+                 PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, marks);
+                ps.setInt(2, id);
+                ps.executeUpdate();
+            }
+        }
+
+        public void delete(int id) throws SQLException {
+            String sql = "DELETE FROM Student WHERE StudentID=?";
+            try (Connection con = DriverManager.getConnection(URL, USER, PASS);
+                 PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, id);
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    // ---------- View ----------
+    static class StudentView {
+        private final StudentDAO dao = new StudentDAO();
+        private final Scanner sc = new Scanner(System.in);
+
+        public void menu() {
+            while (true) {
+                System.out.println("\n1. Add Student");
+                System.out.println("2. Display All");
+                System.out.println("3. Update Marks");
+                System.out.println("4. Delete Student");
+                System.out.println("5. Exit");
+                System.out.print("Choice: ");
+
+                int ch = sc.nextInt();
+                try {
+                    switch (ch) {
+                        case 1 -> addStudent();
+                        case 2 -> displayStudents();
+                        case 3 -> updateMarks();
+                        case 4 -> deleteStudent();
+                        case 5 -> { System.out.println("Bye."); return; }
+                        default -> System.out.println("Invalid choice");
+                    }
+                } catch (Exception e) {
+                    System.out.println("Operation failed: " + e.getMessage());
+                }
+            }
+        }
+
+        private void addStudent() throws Exception {
+            System.out.print("Enter ID Name Department Marks: ");
+            Student s = new Student(sc.nextInt(), sc.next(), sc.next(), sc.nextInt());
+            dao.insert(s);
+            System.out.println("Student added.");
+        }
+
+        private void displayStudents() throws Exception {
+            List<Student> list = dao.getAll();
+            if (list.isEmpty()) {
+                System.out.println("No records found.");
+            } else {
+                for (Student s : list) {
+                    System.out.printf("%d | %s | %s | %d%n",
+                            s.getStudentID(), s.getName(),
+                            s.getDepartment(), s.getMarks());
+                }
+            }
+        }
+
+        private void updateMarks() throws Exception {
+            System.out.print("Enter StudentID and new Marks: ");
+            dao.updateMarks(sc.nextInt(), sc.nextInt());
+            System.out.println("Marks updated.");
+        }
+
+        private void deleteStudent() throws Exception {
+            System.out.print("Enter StudentID to delete: ");
+            dao.delete(sc.nextInt());
+            System.out.println("Student deleted.");
+        }
+    }
+
+    // ---------- Main ----------
+    public static void main(String[] args) {
+        new StudentView().menu();
+    }
+}
